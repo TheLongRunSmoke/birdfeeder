@@ -3,7 +3,7 @@ from datetime import datetime
 from flask import jsonify, request
 from flask_sqlalchemy import get_debug_queries
 
-from app import app
+from app import app, models
 from config import DATABASE_QUERY_TIMEOUT
 from .basicauth import *
 

@@ -18,15 +18,7 @@ JOBS = [
     }
 ]
 
-MAIL_SERVER = 'localhost'
-MAIL_PORT = 25
-MAIL_USERNAME = None
-MAIL_PASSWORD = None
-# administrator email list.
-ADMINS = ['thelongrunsmoke@gmail.com']
-LANGUAGES = {
-    'en': 'English',
-    'ru': 'Русский'
-}
-
 MAINTENANCE_MODE = False
+
+INTERNAL_ROM = "28-000003fb12c7"
+EXTERNAL_ROM = ""

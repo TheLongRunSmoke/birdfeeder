@@ -6,10 +6,11 @@ class Temperature(db.Model):
        Model for temperature storing.
     """
     timestamp = db.Column(db.Integer, primary_key=True, index=True, unique=True)
-    data = db.Column(db.String(20))
+    internal = db.Column(db.Float)
+    external = db.Column(db.Float)
 
     def __repr__(self):
-        return 'From: %r\ntemperature\n%r\n' % (self.timestamp, self.temp)
+        return 'From: %r\ntemperature\n%r\n%r' % (self.timestamp, self.internal, self.external)
 
     def str(self):
-        return 'From: %r\ntemperature\n%r\n' % (self.timestamp, self.temp)
+        return 'From: %r\ntemperature\n%r\n%r' % (self.timestamp, self.internal, self.external)
