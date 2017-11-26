@@ -11,7 +11,7 @@ app.config.from_object('config')
 db = SQLAlchemy(app)
 mail = Mail(app)
 # import parts with initialized context.
-from app import index, models
+from app import index, api, models
 # prepare scheduler.
 scheduler = APScheduler()
 scheduler.init_app(app)

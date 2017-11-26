@@ -10,39 +10,37 @@ from .basicauth import *
 
 @app.route('/api/v1.0/temp', methods=['GET'])
 @auth.login_required
-def get_temperature():
+def get_temperature_for_period():
     """
     Main point of API. Extract list of data from database.
     :return: API data in JSON serialization.
     """
+    try:
+        sensor = int(request.args.get('sensor'))
+        seconds = int(request.args.get('seconds'))
+        time = datetime.utcnow().timestamp()-seconds
+        result = get_from_db(time, sensor)
+    except TypeError:
+        result = {"Error" : "No senconds and/or sensor specifed."}
+    return jsonify(result)
 
-    now = datetime.utcnow()
-    authorizer = Auth()
-    if authorizer.is_authenticate(auth.username(), request.headers.get('iss-key')):
-        result = get_from_db(now.timestamp())
-        return jsonify(result)
-    else:
-        abort(403)
 
-
-def get_from_db(timestamp):
+def get_from_db(timestamp, sensor):
     """
     Return db row with all actual timestamp.
     :param timestamp: now timestamp
     :return: tle dict
     """
     result = {}
-    # TODO: think about optimization for this
-    actual = models.Temperature.query.filter(models.Temperature.timestamp < str(timestamp)) \
-        .order_by(models.Temperature.timestamp.desc()).first()
-    query = models.Temperature.query.filter(models.Temperature.timestamp >= actual.timestamp) \
+    query = models.Temperature.query.filter(models.Temperature.timestamp >= timestamp) \
         .order_by(models.Temperature.timestamp.asc()).all()
     if query is not None:
-        try:
+        if len(query) > 1:
             for row in query:
-                result[row.timestamp] = row.tle
-        except TypeError:
-            result[query.timestamp] = query.tle
+                if sensor == 0:
+                    result[row.timestamp] = row.external
+                else:
+                    result[row.timestamp] = row.internal
     return result
 
 

@@ -10,7 +10,6 @@ def run():
     import glob
 
     base_dir = '/sys/bus/w1/devices/'
-    print(glob.glob(base_dir + '*'))
     devices = glob.glob(base_dir + '28*')
 
     # if no devices try to mount them
@@ -50,8 +49,7 @@ def read_temp(file):
 
 
 def write_to_db(data: Temperature):
-    now = datetime.utcnow().date()
-    timestamp = int(datetime(now.year, now.month, now.day).timestamp())
-    data.timestamp = timestamp
+    now = int(datetime.utcnow().timestamp())
+    data.timestamp = now
     app.db.session.add(data)
     app.db.session.commit()
