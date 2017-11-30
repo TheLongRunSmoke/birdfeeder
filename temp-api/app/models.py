@@ -8,9 +8,7 @@ class Temperature(db.Model):
     timestamp = db.Column(db.Integer, primary_key=True, index=True, unique=True)
     internal = db.Column(db.Float)
     external = db.Column(db.Float)
+    cpu = db.Column(db.Float)
 
     def __repr__(self):
-        return 'From: %r\ntemperature\n%r\n%r' % (self.timestamp, self.internal, self.external)
-
-    def str(self):
-        return 'From: %r\ntemperature\n%r\n%r' % (self.timestamp, self.internal, self.external)
+        return '<Timestamp: %r>' % self.timestamp

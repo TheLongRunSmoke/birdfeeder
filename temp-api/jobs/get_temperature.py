@@ -3,6 +3,7 @@ from datetime import datetime
 import app
 from app.models import Temperature
 from config import INTERNAL_ROM, EXTERNAL_ROM
+from subprocess import PIPE, Popen
 
 
 def run():
@@ -27,6 +28,8 @@ def run():
             device_file = device + '/w1_slave'
             temp.internal = read_temp(device_file)
 
+    temp.cpu = get_cpu_temperature()
+
     write_to_db(temp)
 
 
@@ -46,6 +49,12 @@ def read_temp(file):
         temp_string = lines[1][equals_pos + 2:]
         temp_c = float(temp_string) / 1000.0
         return temp_c
+
+
+def get_cpu_temperature():
+    process = Popen(['vcgencmd', 'measure_temp'], stdout=PIPE)
+    output, _error = process.communicate()
+    return float(output[output.index(b"=")+1:output.index(b"'")])
 
 
 def write_to_db(data: Temperature):

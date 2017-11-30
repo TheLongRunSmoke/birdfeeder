@@ -14,7 +14,7 @@ JOBS = [
         'func': 'jobs.get_temperature:run',
         'args': (),
         'trigger': 'interval',
-        'minutes': 10
+        'minutes': 1
     }
 ]
 
