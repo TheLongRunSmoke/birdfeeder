@@ -14,11 +14,11 @@ JOBS = [
         'func': 'jobs.get_temperature:run',
         'args': (),
         'trigger': 'interval',
-        'minutes': 1
+        'minutes': 10
     }
 ]
 
 MAINTENANCE_MODE = False
 
 INTERNAL_ROM = "28-000003fb12c7"
-EXTERNAL_ROM = ""
+EXTERNAL_ROM = "28-000000000000"
