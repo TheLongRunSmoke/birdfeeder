@@ -8,7 +8,7 @@ from config import DATABASE_QUERY_TIMEOUT
 from .basicauth import *
 
 
-@app.route('/api/v1.0/temp', methods=['GET','OPTIONS'])
+@app.route('/api/v1.0/temp', methods=['GET', 'OPTIONS'])
 @auth.login_required
 def get_temperature_for_period():
     """
@@ -18,10 +18,10 @@ def get_temperature_for_period():
     try:
         seconds = int(request.args.get('seconds'))
     except TypeError:
-        seconds = 43200 # 12 hours
+        seconds = 43200  # 12 hours
     if seconds > 43200:
         seconds = 43200
-    time = datetime.utcnow().timestamp()-seconds
+    time = datetime.utcnow().timestamp() - seconds
     result = get_from_db(time)
     resp = jsonify(result)
     resp.headers['Access-Control-Allow-Origin'] = '*'
@@ -29,14 +29,15 @@ def get_temperature_for_period():
     resp.headers['Access-Control-Allow-Headers'] = 'Authorization, content-type'
     return resp
 
-@app.route('/api/v1.0/temp/change', methods=['GET','OPTIONS'])
+
+@app.route('/api/v1.0/temp/change', methods=['GET', 'OPTIONS'])
 @auth.login_required
 def get_temperature_change():
     """
     Return external temperature change in last hour.
     :return: API data in JSON serialization.
     """
-    time = datetime.utcnow().timestamp()-60*60
+    time = datetime.utcnow().timestamp() - 60 * 60
     result = get_change(time)
     resp = jsonify(result)
     resp.headers['Access-Control-Allow-Origin'] = '*'
@@ -51,7 +52,7 @@ def get_from_db(timestamp):
     :param timestamp: form timestamp
     :return: list
     """
-    result = [[],[],[],[]]
+    result = [[], [], [], []]
     query = models.Temperature.query.filter(models.Temperature.timestamp >= timestamp) \
         .order_by(models.Temperature.timestamp.asc()).all()
     if query is not None:
@@ -63,21 +64,24 @@ def get_from_db(timestamp):
                 result[3].append(row.cpu)
     return result
 
+
 def get_change(timestamp):
     """
     Look up db, and calculate temperature change.
     :param timestamp: form timestamp
     :return: dict
     """
-    result = {'change': 0}
+    result = {'current': 0, 'change': 0}
     query = models.Temperature.query \
-            .with_entities(models.Temperature.external) \
-            .filter(models.Temperature.timestamp >= timestamp) \
-            .order_by(models.Temperature.timestamp.asc()).all()
+        .with_entities(models.Temperature.external) \
+        .filter(models.Temperature.timestamp >= timestamp) \
+        .order_by(models.Temperature.timestamp.asc()).all()
     if query is not None:
         if len(query) > 1:
+            result['current'] = query[-1].external
             result['change'] = query[-1].external - query[0].external
     return result
+
 
 @app.after_request
 def after_request(response):

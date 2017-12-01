@@ -38,6 +38,15 @@ header span {
 article {
   padding: 12px;
 }
+article #ext_informer {
+  display: inline-block;
+  font-size: 40px;
+}
+article #change_informer {
+  display: inline-block;
+  padding-left: 8px;
+  font-size: 20px;
+}
 footer a,
 footer span {
   padding: 16px 12px 8px 12px;

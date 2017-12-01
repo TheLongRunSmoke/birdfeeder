@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
-   fitToContainer(document.querySelector('canvas'))
-   requestData();
+   fitToContainer(document.querySelector('canvas'));
+   requestStatistic();
+   requestChange();
 }, false);
 
 function fitToContainer(canvas){
@@ -10,19 +11,40 @@ function fitToContainer(canvas){
   canvas.height = canvas.offsetHeight;
 }
 
-function requestData() {
+function requestData(uri, callback) {
     var xhttp = new XMLHttpRequest();
-    xhttp.open("GET", "http://192.168.1.120:5000/api/v1.0/temp?seconds=43200", true);
+    xhttp.open("GET", uri, true);
     xhttp.setRequestHeader("Content-type", "application/json");
     xhttp.setRequestHeader("Authorization", "Basic d2ViOjVdQDI7NVptRD85ZjcxbTouWCx1N3ozQkphZ3Y+YA==");
     xhttp.onreadystatechange = function () {
-    if (xhttp.readyState == 4) {
-      if (xhttp.status == 200) {
-          drawChart(JSON.parse(xhttp.responseText));
-      }
-    }
-  };
-  xhttp.send();
+        if (xhttp.readyState == 4) {
+            if (xhttp.status == 200) {
+                callback(JSON.parse(xhttp.responseText));
+            }
+        }
+    };
+    xhttp.send();
+}
+
+function requestStatistic(){
+    requestData("http://192.168.1.120:5000/api/v1.0/temp?seconds=43200", function (response) {
+        drawChart(response);
+    });
+}
+
+function requestChange(){
+    requestData("http://192.168.1.120:5000/api/v1.0/temp/change",function (response) {
+        var ext = document.getElementById("ext_informer");
+        var change = document.getElementById("change_informer");
+        ext.innerHTML = parseFloat(response["current"]).toFixed(2);
+        if (response["change"] > 0){
+            change.innerHTML = "+" + Number(parseFloat(response["change"]).toFixed(2));
+            change.style.color = 'rgb(75, 192, 192)';
+        }else{
+            change.innerHTML = Number(parseFloat(response["change"]).toFixed(2));
+            if (response["change"] != 0){change.style.color = 'rgb(255, 99, 132)';}
+        }
+    });
 }
 
 function drawChart(data){
@@ -35,7 +57,7 @@ function drawChart(data){
             }),
             datasets: [
             {
-                label: 'Воздуха',
+                label: 'Воздух',
                 data: data[1].map(function(d){
                     return Number(parseFloat(d).toFixed(2));
                 }),
