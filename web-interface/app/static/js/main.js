@@ -37,7 +37,7 @@ function drawChart(data){
             {
                 label: 'Воздуха',
                 data: data[1].map(function(d){
-                    return Number(parseFloat(d).toFixed(1));
+                    return Number(parseFloat(d).toFixed(2));
                 }),
                 backgroundColor: 'rgb(54, 162, 235)',
                 borderColor: 'rgb(54, 162, 235)',
@@ -46,7 +46,7 @@ function drawChart(data){
             {
                 label: 'Внутри корпуса',
                 data: data[2].map(function(d){
-                    return Number(parseFloat(d).toFixed(1));
+                    return Number(parseFloat(d).toFixed(2));
                 }),
                 backgroundColor: 'rgb(255, 99, 132)',
                 borderColor: 'rgb(255, 99, 132)',
@@ -55,7 +55,7 @@ function drawChart(data){
             {
                 label: 'Процессор',
                 data: data[3].map(function(d){
-                    return Number(parseFloat(d).toFixed(1));
+                    return Number(parseFloat(d).toFixed(2));
                 }),
                 backgroundColor: 'rgb(75, 192, 192)',
                 borderColor: 'rgb(75, 192, 192)',

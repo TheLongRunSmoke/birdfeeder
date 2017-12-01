@@ -29,12 +29,27 @@ def get_temperature_for_period():
     resp.headers['Access-Control-Allow-Headers'] = 'Authorization, content-type'
     return resp
 
+@app.route('/api/v1.0/temp/change', methods=['GET','OPTIONS'])
+@auth.login_required
+def get_temperature_change():
+    """
+    Return external temperature change in last hour.
+    :return: API data in JSON serialization.
+    """
+    time = datetime.utcnow().timestamp()-60*60
+    result = get_change(time)
+    resp = jsonify(result)
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+    resp.headers['Access-Control-Allow-Headers'] = 'Authorization, content-type'
+    return resp
+
 
 def get_from_db(timestamp):
     """
     Return db row with all actual temperatures.
     :param timestamp: form timestamp
-    :return: dict
+    :return: list
     """
     result = [[],[],[],[]]
     query = models.Temperature.query.filter(models.Temperature.timestamp >= timestamp) \
@@ -48,6 +63,21 @@ def get_from_db(timestamp):
                 result[3].append(row.cpu)
     return result
 
+def get_change(timestamp):
+    """
+    Look up db, and calculate temperature change.
+    :param timestamp: form timestamp
+    :return: dict
+    """
+    result = {'change': 0}
+    query = models.Temperature.query \
+            .with_entities(models.Temperature.external) \
+            .filter(models.Temperature.timestamp >= timestamp) \
+            .order_by(models.Temperature.timestamp.asc()).all()
+    if query is not None:
+        if len(query) > 1:
+            result['change'] = query[-1].external - query[0].external
+    return result
 
 @app.after_request
 def after_request(response):
