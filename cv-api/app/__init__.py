@@ -10,6 +10,8 @@ from app import index
 import cv2
 
 vc = cv2.VideoCapture(0)
+vc.set(3,800)
+vc.set(4,600)
 
 def gen():
     """Video streaming generator function."""
