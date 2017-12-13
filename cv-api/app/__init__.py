@@ -1,30 +1,38 @@
 import os
+import subprocess
 
-from flask import Flask, Response
+from flask import Flask
+from celery import Celery
+from celery.bin import worker
 
 # app initialize.
 app = Flask(__name__)
 app.config.from_object('config')
+app.config.update(
+    CELERY_BROKER_URL='redis://localhost:6379',
+    CELERY_RESULT_BACKEND='redis://localhost:6379'
+)
+
+def make_celery(app):
+    celery = Celery(app.import_name, backend=app.config['CELERY_RESULT_BACKEND'],
+                    broker=app.config['CELERY_BROKER_URL'])
+    celery.conf.update(app.config)
+    TaskBase = celery.Task
+    class ContextTask(TaskBase):
+        abstract = True
+        def __call__(self, *args, **kwargs):
+            with app.app_context():
+                return TaskBase.__call__(self, *args, **kwargs)
+    celery.Task = ContextTask
+    return celery
+
+celery = make_celery(app)
+
 # import parts with initialized context.
-from app import index
-import cv2
+from app import index,cv
+from app.cv import CV
+app.cam0 = CV()
 
-vc = cv2.VideoCapture(0)
-vc.set(3,800)
-vc.set(4,600)
-
-def gen():
-    """Video streaming generator function."""
-    while True:
-        rval, frame = vc.read()
-        cv2.imwrite('t.jpg', frame)
-        yield (b'--frame\r\n'b'Content-Type: image/jpeg\r\n\r\n' + open('t.jpg', 'rb').read() + b'\r\n')
-
-
-@app.route('/video_feed')
-def video_feed():
-    """Video streaming route. Put this in the src attribute of an img tag."""
-    return Response(gen(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 if not app.debug:
     import logging
