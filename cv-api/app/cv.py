@@ -10,11 +10,11 @@ class CV:
     def __init__(self):
         self.feed = cv2.VideoCapture(0)
         self.feed.set(cv2.CAP_PROP_FRAME_WIDTH,800)
-        self.feed.set(cv2.CAP_PROP_FRAME_WIDTH,600)
-        self.tmp = 't.jpg'
+        self.feed.set(cv2.CAP_PROP_FRAME_HEIGHT,600)
         self.isUpdated = False
         self.time = 0
         self.fps = 0
+        self.streamBuf = None
         
         self.loop = asyncio.get_event_loop()
         self.pool = ThreadPoolExecutor(max_workers=multiprocessing.cpu_count())
@@ -25,7 +25,7 @@ class CV:
         while True:
             if self.isUpdated:
                 yield (b'--frame\r\n'b'Content-Type: image/jpeg\r\n\r\n' \
-                   + open(self.tmp,'rb').read() + b'\r\n')
+                   + self.imageBuf.tostring() + b'\r\n')
                 self.isUpdated = False
 
     def return_frame():
@@ -38,14 +38,13 @@ class CV:
                 if(self.time == int(time.time())):
                     self.fps += 1
                 else:
-                    print('FPS: real: %i: prop: %i' \
-                          % (self.fps,self.feed.get(cv2.CAP_PROP_FPS)))
+                    print('FPS: %i' % (self.fps))
                     self.time = int(time.time())
                     self.fps=0
             
                 rval, frame = self.feed.retrieve()
                 if not self.isUpdated:
-                    cv2.imwrite('t.jpg', frame)
+                    ret, self.imageBuf = cv2.imencode('*.jpg', frame)
                     self.isUpdated = True
         
                 
