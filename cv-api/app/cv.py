@@ -2,6 +2,7 @@ import os, time
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
+import numpy
 from app import app
 import cv2
 
@@ -11,6 +12,9 @@ class CV:
         self.feed = cv2.VideoCapture(0)
         self.feed.set(cv2.CAP_PROP_FRAME_WIDTH,800)
         self.feed.set(cv2.CAP_PROP_FRAME_HEIGHT,600)
+        self.feed.set(cv2.CAP_PROP_SHARPNESS,1)
+        self.feed.set(cv2.CAP_PROP_AUTO_EXPOSURE,0.25) # manual mode
+        self.feed.set(cv2.CAP_PROP_EXPOSURE, 0)
         self.isUpdated = False
         self.time = 0
         self.fps = 0
@@ -28,9 +32,6 @@ class CV:
                    + self.imageBuf.tostring() + b'\r\n')
                 self.isUpdated = False
 
-    def return_frame():
-        yield 
-
     def process(self):
         while True:
             if self.feed.grab() == True:
@@ -43,8 +44,35 @@ class CV:
                     self.fps=0
             
                 rval, frame = self.feed.retrieve()
+
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+                yuv = cv2.cvtColor(frame, cv2.COLOR_BGR2YUV)
+
+                lumaAvg = numpy.average(yuv[:,:,0])              
+                print(self.getExposure(), lumaAvg)
+                if (lumaAvg > 160):
+                    self.decExposure()
+                if (lumaAvg < 120):
+                    self.incExposure()
+                                
                 if not self.isUpdated:
                     ret, self.imageBuf = cv2.imencode('*.jpg', frame)
                     self.isUpdated = True
-        
-                
+
+    def getExposure(self):
+        exp = self.feed.get(cv2.CAP_PROP_EXPOSURE)
+        return exp
+
+    def incExposure(self):
+        exp = self.getExposure() + 0.0003
+        print('inc')
+        if exp <= 1:
+            self.feed.set(cv2.CAP_PROP_EXPOSURE, exp)
+            
+    def decExposure(self):
+        exp = self.getExposure() - 0.0003
+        print('dec')
+        if exp >= 0:
+            self.feed.set(cv2.CAP_PROP_EXPOSURE, exp)
+ 
