@@ -13,10 +13,10 @@ class CV:
         self.feed.set(cv2.CAP_PROP_FRAME_WIDTH,800)
         self.feed.set(cv2.CAP_PROP_FRAME_HEIGHT,600)
         self.feed.set(cv2.CAP_PROP_AUTO_EXPOSURE,0.25) # manual mode
-        self.feed.set(cv2.CAP_PROP_EXPOSURE, 0.5)
+        self.feed.set(cv2.CAP_PROP_EXPOSURE, 0.005)
         self.isUpdated = False
         self.time = 0
-        self.fps = 0
+        self.fps = 1
         self.streamBuf = None
 
         self.skipCounter=0
@@ -43,30 +43,30 @@ class CV:
 
                 self.autoExposure(cv2.cvtColor(frame, cv2.COLOR_BGR2YUV))
 
+                gray = cv2.resize(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), \
+                                  None,fx=0.4, fy=0.4, interpolation = cv2.INTER_CUBIC)                  
 
-##                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)                
-##
-##                img_dft = cv2.dft(numpy.float32(gray),flags=cv2.DFT_COMPLEX_OUTPUT)
-##                magnitude, angle = cv2.cartToPolar(img_dft[:, :, 0], img_dft[:, :, 1])
-##                log_ampl = numpy.log10(magnitude.clip(min=1e-9))
-##                log_ampl_blur = cv2.blur(log_ampl, (3, 3))
-##                magn = numpy.exp(log_ampl-log_ampl_blur)
-##                img_dft[:, :, 0], img_dft[:, :, 1] = cv2.polarToCart(magn, angle)
-##                img_combined = cv2.idft(img_dft)
-##                sal, _ = cv2.cartToPolar(img_combined[:, :, 0], img_combined[:, :, 1])
-##
-##                sal = cv2.GaussianBlur(sal,(5,5),sigmaX=8, sigmaY=0)
-##
-##                sal = sal**2
-##                sal = numpy.float32(sal)/numpy.max(sal)
-##                sal = cv2.resize(sal, frame.shape[1::-1])
-            
-                #colorSal = cv2.cvtColor(sal,cv2.COLOR_GRAY2RGB)
-                                
+                img_dft = cv2.dft(numpy.float32(gray),flags=cv2.DFT_COMPLEX_OUTPUT)
+                magnitude, angle = cv2.cartToPolar(img_dft[:, :, 0], img_dft[:, :, 1])
+                log_ampl = numpy.log10(magnitude.clip(min=1e-9))
+                log_ampl_blur = cv2.blur(log_ampl, (3, 3))
+                magn = numpy.exp(log_ampl-log_ampl_blur)
+                img_dft[:, :, 0], img_dft[:, :, 1] = cv2.polarToCart(magn, angle)
+                img_combined = cv2.idft(img_dft)
+                sal, _ = cv2.cartToPolar(img_combined[:, :, 0], img_combined[:, :, 1])
+
+                sal = cv2.GaussianBlur(sal,(5,5),sigmaX=8, sigmaY=0)
+
+                sal = sal**2
+                sal = 256*numpy.float32(sal)/numpy.max(sal)
+                sal = cv2.resize(sal, frame.shape[1::-1])
+
+                colorSal = cv2.cvtColor(numpy.array(sal, dtype=numpy.uint8),cv2.COLOR_GRAY2BGR)
+                
                 if not self.isUpdated:
-                    ret, self.imageBuf = cv2.imencode('*.jpg', frame)
-##                    ret, self.imageBuf = cv2.imencode('*.jpg', \
-##                                        numpy.concatenate((frame, colorSal), axis=0))
+                    #ret, self.imageBuf = cv2.imencode('*.jpg', colorSal)
+                    ret, self.imageBuf = cv2.imencode('*.jpg', \
+                                        numpy.concatenate((frame, colorSal), axis=0))
                     self.isUpdated = True
 
     def autoExposure(self, yuv_frame):
@@ -101,4 +101,4 @@ class CV:
         else:
             print('FPS: %i' % (self.fps))
             self.time = int(time.time())
-            self.fps=0
+            self.fps=1
