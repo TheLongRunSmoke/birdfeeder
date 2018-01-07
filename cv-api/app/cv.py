@@ -1,4 +1,4 @@
-import os, time, timeit
+import os, time, datetime, pathlib
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
@@ -6,10 +6,12 @@ import numpy
 from app import app
 import cv2
 
-
 class CV:
 
     def __init__(self):
+
+        self.PATH = '/home/pi/Desktop/captures/'
+        
         self.feed = cv2.VideoCapture(0)
         self.feed.set(cv2.CAP_PROP_FRAME_WIDTH,800)
         self.feed.set(cv2.CAP_PROP_FRAME_HEIGHT,600)
@@ -20,11 +22,12 @@ class CV:
         self.fps = 0
         self.streamBuf = None
 
+        self.lastSharpness = 0
+        
         self.substractor = cv2.bgsegm.createBackgroundSubtractorCNT(minPixelStability = 5,
-                              useHistory = True,
-                              maxPixelStability = 5*60,
-                              isParallel = False)
-        self.history = 100
+                             useHistory = False,
+                             maxPixelStability = 5*60,
+                             isParallel = False)
 
         self.skipCounter=0
         
@@ -47,33 +50,46 @@ class CV:
                 self.countFPS()
             
                 rval, frame = self.feed.retrieve()
-                
-                self.autoExposure(cv2.cvtColor(frame, cv2.COLOR_BGR2YUV))
+
+                luma = self.autoExposure(cv2.cvtColor(frame, cv2.COLOR_BGR2YUV))
 
                 gray = cv2.resize(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), \
-                                  None,fx=0.2, fy=0.2, interpolation = cv2.INTER_LINEAR)                  
-
+                                  None,fx=0.05, fy=0.05, interpolation = cv2.INTER_LINEAR)                  
                 mask = self.substractor.apply(gray)
-                mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
-                mask = cv2.resize(mask, frame.shape[1::-1])
+                maskSum = numpy.sum(mask)
+
+                if (maskSum > 20000):
+                        sharpness = self.checkAndSave(frame)
                 
                 if not self.isUpdated:
+
+                    output = frame
+
+                    text = "Nothing"
+                    if (maskSum > 20000):
+                        text = "Bird presence"
+                    cv2.putText(output, text, (10,30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2,cv2.LINE_AA)
+                    cv2.putText(output, str(luma), (10,70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2,cv2.LINE_AA)
+                    cv2.putText(output, str(sharpness), (10,110), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2,cv2.LINE_AA)
+
                     ret, self.imageBuf = cv2.imencode('*.jpg', \
-                                        numpy.concatenate((frame, frame & mask), axis=0))
+                                output, \
+                                [cv2.IMWRITE_JPEG_QUALITY, 80])
                     self.isUpdated = True
 
-    #@timeit
     def autoExposure(self, yuv_frame):
         self.skipCounter = self.skipCounter-1
         if (self.skipCounter < 1):
             lumaAvg = numpy.average(yuv_frame[:,:,0])
-            print(lumaAvg, self.getExposure())
-            if (lumaAvg > 190) or (lumaAvg < 160):
+            #print(lumaAvg, self.getExposure())
+            if (lumaAvg > 190) or (lumaAvg < 165):
                 self.skipCounter = 2
                 newExposure = 175*self.getExposure()/lumaAvg
                 if (newExposure < 1):
-                    print("newExposure: %f" % newExposure)
+                    #print("newExposure: %f" % newExposure)
                     self.feed.set(cv2.CAP_PROP_EXPOSURE, newExposure)
+            return lumaAvg
+        return 0
 
     def getExposure(self):
         exp = self.feed.get(cv2.CAP_PROP_EXPOSURE)
@@ -87,16 +103,17 @@ class CV:
             self.time = int(time.time())
             self.fps=0
 
-    def timeit(method):
-        def timed(*args, **kw):
-            ts = time.time()
-            result = method(*args, **kw)
-            te = time.time()
-            if 'log_time' in kw:
-                name = kw.get('log_name', method.__name__.upper())
-                kw['log_time'][name] = int((te - ts) * 1000)
-            else:
-                print('%r  %2.2f ms' % \
-                      (method.__name__, (te - ts) * 1000))
-            return result
-        return timed
+    def checkAndSave(self, frame):
+        # check sharpness
+        sharpness = cv2.Laplacian(frame, cv2.CV_64F).var()
+        if sharpness > self.lastSharpness:
+            now = datetime.datetime.now()
+            folder = '{}{}'.format(self.PATH, now.strftime('%Y-%m-%d'))
+            if not os.path.exists(folder):
+                pathlib.Path(folder).mkdir(parents=True, exist_ok=True)
+            file = now.strftime('%H-%M-%S-%f')
+            print('{}/{}.jpg'.format(folder,file))
+            cv2.imwrite('{}/{}.jpg'.format(folder,file),frame,[cv2.IMWRITE_JPEG_QUALITY, 95])
+        self.lastSharpness = sharpness
+        return self.lastSharpness
+            
