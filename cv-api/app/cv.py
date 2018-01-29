@@ -56,9 +56,8 @@ class CV:
                 gray = cv2.resize(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), \
                                   None,fx=0.05, fy=0.05, interpolation = cv2.INTER_LINEAR)                  
                 mask = self.substractor.apply(gray)
-                maskSum = numpy.sum(mask)
-
-                if (maskSum > 20000):
+                
+                if self.isBird(mask):
                         sharpness = self.checkAndSave(frame)
                 
                 if not self.isUpdated:
@@ -66,11 +65,11 @@ class CV:
                     output = frame
 
                     text = "Nothing"
-                    if (maskSum > 20000):
+                    if self.isBird(mask):
                         text = "Bird presence"
+                        cv2.putText(output, str(sharpness), (10,70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2,cv2.LINE_AA)
                     cv2.putText(output, text, (10,30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2,cv2.LINE_AA)
-                    cv2.putText(output, str(luma), (10,70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2,cv2.LINE_AA)
-                    cv2.putText(output, str(sharpness), (10,110), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2,cv2.LINE_AA)
+                    
 
                     ret, self.imageBuf = cv2.imencode('*.jpg', \
                                 output, \
@@ -103,6 +102,15 @@ class CV:
             self.time = int(time.time())
             self.fps=0
 
+    def isBird(self, mask):
+        height, width = mask.shape
+        maximum=height*width*255
+        maskSum = numpy.sum(mask)
+        if not ((maskSum < maximum*0.1) or (maskSum > maximum*0.6)):
+            return True
+        return False
+            
+
     def checkAndSave(self, frame):
         # check sharpness
         sharpness = cv2.Laplacian(frame, cv2.CV_64F).var()
@@ -113,7 +121,8 @@ class CV:
                 pathlib.Path(folder).mkdir(parents=True, exist_ok=True)
             file = now.strftime('%H-%M-%S-%f')
             print('{}/{}.jpg'.format(folder,file))
-            cv2.imwrite('{}/{}.jpg'.format(folder,file),frame,[cv2.IMWRITE_JPEG_QUALITY, 95])
+            cv2.imwrite('{}/{}.jpg'.format(folder,file),frame, \
+                        [cv2.IMWRITE_JPEG_QUALITY, 80])
         self.lastSharpness = sharpness
         return self.lastSharpness
             
