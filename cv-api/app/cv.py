@@ -1,23 +1,33 @@
-import os, time
+import os, time, datetime, pathlib
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
 import numpy
+import pyudev
+import psutil
 from app import app
 import cv2
 
 class CV:
 
     def __init__(self):
+        
         self.feed = cv2.VideoCapture(0)
         self.feed.set(cv2.CAP_PROP_FRAME_WIDTH,800)
         self.feed.set(cv2.CAP_PROP_FRAME_HEIGHT,600)
         self.feed.set(cv2.CAP_PROP_AUTO_EXPOSURE,0.25) # manual mode
-        self.feed.set(cv2.CAP_PROP_EXPOSURE, 0.5)
+        self.feed.set(cv2.CAP_PROP_EXPOSURE, 0.005)
         self.isUpdated = False
         self.time = 0
         self.fps = 0
         self.streamBuf = None
+
+        self.lastSharpness = 0
+        
+        self.substractor = cv2.bgsegm.createBackgroundSubtractorCNT(minPixelStability = 5,
+                             useHistory = False,
+                             maxPixelStability = 5*60,
+                             isParallel = False)
 
         self.skipCounter=0
         
@@ -41,59 +51,48 @@ class CV:
             
                 rval, frame = self.feed.retrieve()
 
-                self.autoExposure(cv2.cvtColor(frame, cv2.COLOR_BGR2YUV))
+                luma = self.autoExposure(cv2.cvtColor(frame, cv2.COLOR_BGR2YUV))
 
-
-##                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)                
-##
-##                img_dft = cv2.dft(numpy.float32(gray),flags=cv2.DFT_COMPLEX_OUTPUT)
-##                magnitude, angle = cv2.cartToPolar(img_dft[:, :, 0], img_dft[:, :, 1])
-##                log_ampl = numpy.log10(magnitude.clip(min=1e-9))
-##                log_ampl_blur = cv2.blur(log_ampl, (3, 3))
-##                magn = numpy.exp(log_ampl-log_ampl_blur)
-##                img_dft[:, :, 0], img_dft[:, :, 1] = cv2.polarToCart(magn, angle)
-##                img_combined = cv2.idft(img_dft)
-##                sal, _ = cv2.cartToPolar(img_combined[:, :, 0], img_combined[:, :, 1])
-##
-##                sal = cv2.GaussianBlur(sal,(5,5),sigmaX=8, sigmaY=0)
-##
-##                sal = sal**2
-##                sal = numpy.float32(sal)/numpy.max(sal)
-##                sal = cv2.resize(sal, frame.shape[1::-1])
-            
-                #colorSal = cv2.cvtColor(sal,cv2.COLOR_GRAY2RGB)
-                                
+                gray = cv2.resize(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), \
+                                  None,fx=0.05, fy=0.05, interpolation = cv2.INTER_LINEAR)                  
+                mask = self.substractor.apply(gray)
+                
+                if self.isBird(mask):
+                        sharpness = self.checkAndSave(frame)
+                
                 if not self.isUpdated:
-                    ret, self.imageBuf = cv2.imencode('*.jpg', frame)
-##                    ret, self.imageBuf = cv2.imencode('*.jpg', \
-##                                        numpy.concatenate((frame, colorSal), axis=0))
+
+                    output = frame
+
+                    text = "Nothing"
+                    if self.isBird(mask):
+                        text = "Bird presence"
+                        cv2.putText(output, str(sharpness), (10,70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2,cv2.LINE_AA)
+                    cv2.putText(output, text, (10,30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2,cv2.LINE_AA)
+                    
+
+                    ret, self.imageBuf = cv2.imencode('*.jpg', \
+                                output, \
+                                [cv2.IMWRITE_JPEG_QUALITY, 80])
                     self.isUpdated = True
 
     def autoExposure(self, yuv_frame):
         self.skipCounter = self.skipCounter-1
         if (self.skipCounter < 1):
             lumaAvg = numpy.average(yuv_frame[:,:,0])
-            print(lumaAvg, self.getExposure())
-            if (lumaAvg > 190) or (lumaAvg < 160):
+            #print(lumaAvg, self.getExposure())
+            if (lumaAvg > 190) or (lumaAvg < 165):
                 self.skipCounter = 2
                 newExposure = 175*self.getExposure()/lumaAvg
-                print("newExposure: %f" % newExposure)
                 if (newExposure < 1):
+                    #print("newExposure: %f" % newExposure)
                     self.feed.set(cv2.CAP_PROP_EXPOSURE, newExposure)
+            return lumaAvg
+        return 0
 
     def getExposure(self):
         exp = self.feed.get(cv2.CAP_PROP_EXPOSURE)
         return exp
-
-    def incExposure(self):
-        exp = self.getExposure() + 0.0003
-        if exp <= 1:
-            self.feed.set(cv2.CAP_PROP_EXPOSURE, exp)
-            
-    def decExposure(self):
-        exp = self.getExposure() - 0.0003
-        if exp >= 0:
-            self.feed.set(cv2.CAP_PROP_EXPOSURE, exp)
 
     def countFPS(self):
         if(self.time == int(time.time())):
@@ -102,3 +101,36 @@ class CV:
             print('FPS: %i' % (self.fps))
             self.time = int(time.time())
             self.fps=0
+
+    def isBird(self, mask):
+        height, width = mask.shape
+        maximum=height*width*255
+        maskSum = numpy.sum(mask)
+        if not ((maskSum < maximum*0.1) or (maskSum > maximum*0.6)):
+            return True
+        return False
+            
+    def checkAndSave(self, frame):
+        # check sharpness
+        sharpness = cv2.Laplacian(frame, cv2.CV_64F).var()
+        if sharpness > self.lastSharpness:
+            now = datetime.datetime.now()
+            self.getSavePath()
+            folder = '{}/{}'.format(self.getSavePath(), now.strftime('%Y-%m-%d'))
+            if not os.path.exists(folder):
+                pathlib.Path(folder).mkdir(parents=True, exist_ok=True)
+            file = now.strftime('%H-%M-%S-%f')
+            print('{}/{}.jpg'.format(folder,file))
+            cv2.imwrite('{}/{}.jpg'.format(folder,file),frame, \
+                        [cv2.IMWRITE_JPEG_QUALITY, 80])
+        self.lastSharpness = sharpness
+        return self.lastSharpness
+
+    def getSavePath(self):
+        context = pyudev.Context()
+        removable = [device for device in context.list_devices(subsystem='block', DEVTYPE='disk') if device.attributes.asstring('removable') == "1"]
+        for device in removable:
+            partitions = [device.device_node for device in context.list_devices(subsystem='block', DEVTYPE='partition', parent=device)]
+            for p in psutil.disk_partitions():
+                if p.device in partitions:
+                    return p.mountpoint
