@@ -13,8 +13,8 @@ class CV:
     def __init__(self):
         
         self.feed = cv2.VideoCapture(0)
-        self.feed.set(cv2.CAP_PROP_FRAME_WIDTH,800)
-        self.feed.set(cv2.CAP_PROP_FRAME_HEIGHT,600)
+        #self.feed.set(cv2.CAP_PROP_FRAME_WIDTH,800)
+        #self.feed.set(cv2.CAP_PROP_FRAME_HEIGHT,600)
         self.feed.set(cv2.CAP_PROP_AUTO_EXPOSURE,0.25) # manual mode
         self.feed.set(cv2.CAP_PROP_EXPOSURE, 0.005)
         self.isUpdated = False
@@ -22,12 +22,10 @@ class CV:
         self.fps = 0
         self.streamBuf = None
 
-        self.lastSharpness = 0
-        
-        self.substractor = cv2.bgsegm.createBackgroundSubtractorCNT(minPixelStability = 5,
-                             useHistory = False,
-                             maxPixelStability = 5*60,
-                             isParallel = False)
+        self.path = None
+
+        self.cascade = cv2.CascadeClassifier('app/cascade_114.xml')
+        self.size = (200,200)
 
         self.skipCounter=0
         
@@ -51,25 +49,26 @@ class CV:
             
                 rval, frame = self.feed.retrieve()
 
-                luma = self.autoExposure(cv2.cvtColor(frame, cv2.COLOR_BGR2YUV))
+                exp = cv2.resize(frame,None,fx=0.25,fy=0.25, interpolation = cv2.INTER_LINEAR)
 
-                gray = cv2.resize(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), \
-                                  None,fx=0.05, fy=0.05, interpolation = cv2.INTER_LINEAR)                  
-                mask = self.substractor.apply(gray)
+                self.autoExposure(cv2.cvtColor(exp, cv2.COLOR_BGR2YUV))
+
+                #gray = cv2.resize(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), \
+                #                  None,fx=0.05, fy=0.05, interpolation = cv2.INTER_LINEAR)
                 
-                if self.isBird(mask):
-                        sharpness = self.checkAndSave(frame)
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                birds = self.cascade.detectMultiScale(gray, 1.2, 2, \
+                                                minSize=self.size)
+
+                if len(birds) > 0:
+                    self.save(frame, birds)
                 
                 if not self.isUpdated:
 
                     output = frame
 
-                    text = "Nothing"
-                    if self.isBird(mask):
-                        text = "Bird presence"
-                        cv2.putText(output, str(sharpness), (10,70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2,cv2.LINE_AA)
-                    cv2.putText(output, text, (10,30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2,cv2.LINE_AA)
-                    
+                    for (x,y,w,h) in birds:
+                        cv2.rectangle(frame,(x,y),(x+w,y+h),(0,255,0),2)
 
                     ret, self.imageBuf = cv2.imencode('*.jpg', \
                                 output, \
@@ -81,9 +80,9 @@ class CV:
         if (self.skipCounter < 1):
             lumaAvg = numpy.average(yuv_frame[:,:,0])
             #print(lumaAvg, self.getExposure())
-            if (lumaAvg > 190) or (lumaAvg < 165):
+            if (lumaAvg > 190) or (lumaAvg < 170):
                 self.skipCounter = 2
-                newExposure = 175*self.getExposure()/lumaAvg
+                newExposure = 180*self.getExposure()/lumaAvg
                 if (newExposure < 1):
                     #print("newExposure: %f" % newExposure)
                     self.feed.set(cv2.CAP_PROP_EXPOSURE, newExposure)
@@ -110,27 +109,29 @@ class CV:
             return True
         return False
             
-    def checkAndSave(self, frame):
-        # check sharpness
-        sharpness = cv2.Laplacian(frame, cv2.CV_64F).var()
-        if sharpness > self.lastSharpness:
-            now = datetime.datetime.now()
-            self.getSavePath()
-            folder = '{}/{}'.format(self.getSavePath(), now.strftime('%Y-%m-%d'))
-            if not os.path.exists(folder):
-                pathlib.Path(folder).mkdir(parents=True, exist_ok=True)
-            file = now.strftime('%H-%M-%S-%f')
-            print('{}/{}.jpg'.format(folder,file))
-            cv2.imwrite('{}/{}.jpg'.format(folder,file),frame, \
-                        [cv2.IMWRITE_JPEG_QUALITY, 80])
-        self.lastSharpness = sharpness
-        return self.lastSharpness
+    def save(self, frame, birds):
+        now = datetime.datetime.now()
+        folder = '{}/{}/{}'.format(self.getSavePath(), now.strftime('%Y-%m-%d'), now.strftime('%H'))
+        if not os.path.exists(folder):
+            pathlib.Path(folder).mkdir(parents=True, exist_ok=True)
+        file = now.strftime('%Y-%m-%d-%H-%M-%S-%f')
+        print('{}/{}.jpg'.format(folder,file))
+        cv2.imwrite('{}/{}.jpg'.format(folder,file),frame, \
+                    [cv2.IMWRITE_JPEG_QUALITY, 100])
+        for (x,y,w,h) in birds:
+                        cv2.rectangle(frame,(x,y),(x+w,y+h),(0,255,0),2)
+        cv2.imwrite('{}/{}_a.jpg'.format(folder,file),frame, \
+                    [cv2.IMWRITE_JPEG_QUALITY, 50])
 
     def getSavePath(self):
+        if (self.path) is not None:
+            if (os.path.exists(self.path)):
+                return self.path
         context = pyudev.Context()
         removable = [device for device in context.list_devices(subsystem='block', DEVTYPE='disk') if device.attributes.asstring('removable') == "1"]
         for device in removable:
             partitions = [device.device_node for device in context.list_devices(subsystem='block', DEVTYPE='partition', parent=device)]
             for p in psutil.disk_partitions():
                 if p.device in partitions:
-                    return p.mountpoint
+                    self.path = p.mountpoint
+                    return self.path
