@@ -1,6 +1,7 @@
 import time
 
-import picamera
+import picamera as pi
+import picamera.array as pi_array
 
 from app.cam.ICamera import ICamera
 
@@ -8,15 +9,19 @@ from app.cam.ICamera import ICamera
 class PiCamera(ICamera):
 
     def __init__(self) -> None:
-        self.camera = picamera.PiCamera()
-        self.camera.resolution = (1920, 1080)
-        self.camera.framerate = 30
-        self.feed = PiRGBArray(self.camera, size = (1920,1080))
+        self.camera = pi.PiCamera()
+        size = (1920,1080)
+        self.camera.resolution = size
+        self.camera.framerate = 20
+        self.camera.exposure_compensation = 6
+        self.feed = pi_array.PiRGBArray(self.camera, size = size)
         time.sleep(0.1)
 
     def retrieve(self):
-        for frame in self.camera.capture_continuous(self.feed, format="bgr", use_video_port=True):
-            return frame.array
+        self.camera.capture(self.feed, format="bgr")
+        frame = self.feed.array
+        self.feed.truncate(0)
+        return frame
 
     def get_exposure(self):
         pass

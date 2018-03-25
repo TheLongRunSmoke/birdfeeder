@@ -1,5 +1,5 @@
 import numpy
-from cv2 import cv2
+import cv2
 
 from app.cam.ICamera import ICamera
 
@@ -8,7 +8,6 @@ class WebCamera(ICamera):
 
     def __init__(self, camera_id) -> None:
         self.feed = cv2.VideoCapture(camera_id)
-        self.feed.init()
         self.feed.set(cv2.CAP_PROP_FRAME_WIDTH, 800)
         self.feed.set(cv2.CAP_PROP_FRAME_HEIGHT, 600)
         self.feed.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)  # manual mode

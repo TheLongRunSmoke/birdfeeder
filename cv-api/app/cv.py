@@ -10,14 +10,14 @@ import cv2
 import psutil
 import pyudev
 
-from app.cam.WebCamera import WebCamera
+from app.cam.PiCamera import PiCamera
 from app.detector import Detector
 
 
 class CV:
 
     def __init__(self):
-        self.feed = WebCamera(0)
+        self.feed = PiCamera()
 
         self.isUpdated = False
         self.time = 0
@@ -78,7 +78,7 @@ class CV:
         folder = os.path.join(self.get_save_path(), now.strftime('%Y-%m-%d'), now.strftime('%H'))
         if not os.path.exists(folder):
             pathlib.Path(folder).mkdir(parents=True, exist_ok=True)
-        file = now.strftime('%Y-%m-%d-%H-%M-%S-%f')
+        file = now.strftime('%Y-%m-%d-%H-%M-%S-%f') + ".jpg"
         full_path = os.path.join(folder, file)
         print(full_path)
         cv2.imwrite(full_path, frame,
