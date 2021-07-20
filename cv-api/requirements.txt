@@ -13,4 +13,4 @@ six==1.11.0
 sqlparse==0.2.4
 Tempita==0.5.2
 tzlocal==1.4
-Werkzeug==0.12.2
+Werkzeug==0.15.3
